@@ -397,8 +397,26 @@ final class AnisetteDataHelper
                 if let clientInfo = json["client_info"] {
                     self.printOut("Server is V3")
                     
-                    self.clientInfo = clientInfo
-                    self.userAgent = json["user_agent"]!
+                    // Apple refuses (-80045 / HTTP 503) a sign-in whose device does not match
+                    // the ADI library the anisette data was made on. Public servers make it
+                    // with Apple's Android library but still advertise a stock Mac (or an
+                    // Android phone), so report a Windows PC instead, as SideInstaller and
+                    // isideload do. Servers that advertise something else are left alone.
+                    let advertised = clientInfo.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let advertisedAgent = json["user_agent"] ?? "akd/1.0 CFNetwork/808.1.4"
+                    let stockClients = [
+                        "<MacBookPro13,2> <macOS;13.1;22C65>",
+                        "<MacBookPro15,1> <Mac OS X;10.15.2;19C57>"
+                    ]
+                    let isStock = stockClients.contains { advertised.hasPrefix($0) }
+                    if advertised.isEmpty || isStock || advertised.contains("<Android;") {
+                        self.printOut("Server advertised \(advertised); reporting a Windows PC instead")
+                        self.clientInfo = "<PC> <Windows;6.2(0,0);9200> <com.apple.AuthKit/1 (com.apple.iTunes/12.12.4.1)>"
+                        self.userAgent = "akd/1.0 CFNetwork/808.1.4"
+                    } else {
+                        self.clientInfo = advertised
+                        self.userAgent = advertisedAgent
+                    }
                     self.printOut("Client-Info: \(self.clientInfo!)")
                     self.printOut("User-Agent: \(self.userAgent!)")
                     
